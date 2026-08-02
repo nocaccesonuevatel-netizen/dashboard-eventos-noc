@@ -14,6 +14,11 @@ if uploaded_file is not None:
         # Limpiar espacios en los nombres de columnas
         df_raw.columns = [str(col).strip() for col in df_raw.columns]
         
+        # Identificar la columna AG (posición 32 de base 0, la 33ª columna)
+        col_ag_nombre = None
+        if len(df_raw.columns) >= 33:
+            col_ag_nombre = df_raw.columns[32]  # Toma el nombre exacto de la columna AG
+        
         # Columnas requeridas
         columnas_deseadas = [
             "FECHA INICIO", "HORA INICIO", "IMPACTO", "ZONA AFECTADA", 
@@ -27,7 +32,15 @@ if uploaded_file is not None:
             st.error("❌ Faltan columnas principales. Asegúrate de incluir 'FECHA INICIO' y 'CIUDAD'.")
             st.write("Columnas detectadas:", list(df_raw.columns))
         else:
-            df = df_raw[cols_existentes].copy()
+            df = df_raw.copy()
+
+            # --- FILTRO POR ESTADO (COLUMNA AG == PENDIENTE) ---
+            if col_ag_nombre:
+                # Filtrar solo aquellos cuya columna AG sea igual a "PENDIENTE"
+                df = df[df[col_ag_nombre].astype(str).str.strip().str.upper() == "PENDIENTE"]
+            # --------------------------------------------------
+
+            df = df[cols_existentes].copy()
 
             # Procesamiento de Fechas
             df["Fecha_DT"] = pd.to_datetime(df["FECHA INICIO"], dayfirst=True, errors="coerce")
@@ -46,6 +59,21 @@ if uploaded_file is not None:
             # Barra Lateral - Filtros
             st.sidebar.header("🔍 Filtros")
             
+            # Filtro por Rango de Fechas
+            if not df.empty:
+                min_date = df["Fecha_DT"].min().date()
+                max_date = df["Fecha_DT"].max().date()
+                
+                date_range = st.sidebar.date_input(
+                    "Rango de Fechas",
+                    value=(min_date, max_date),
+                    min_value=min_date,
+                    max_value=max_date,
+                    format="DD/MM/YYYY"
+                )
+            else:
+                date_range = None
+
             anios_opt = sorted(df["Año"].unique(), reverse=True)
             selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt)
 
@@ -58,13 +86,20 @@ if uploaded_file is not None:
             ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
             selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt)
 
-            # Aplicar Filtros
-            df_filtered = df[
+            # Aplicar Filtros generales
+            mask = (
                 (df["Año"].isin(selected_anios)) &
                 (df["Mes"].isin(selected_meses)) &
                 (df["Semana"].isin(selected_semanas)) &
                 (df["CIUDAD"].isin(selected_ciudades))
-            ]
+            )
+
+            # Validar rango de fechas
+            if date_range and isinstance(date_range, tuple) and len(date_range) == 2:
+                start_date, end_date = date_range
+                mask = mask & (df["Fecha_DT"].dt.date >= start_date) & (df["Fecha_DT"].dt.date <= end_date)
+
+            df_filtered = df[mask]
 
             # Visualización KPIs y Tabla
             st.subheader("📊 Resumen General")
