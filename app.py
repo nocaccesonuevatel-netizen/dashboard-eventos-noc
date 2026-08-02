@@ -59,44 +59,53 @@ if uploaded_file is not None:
             # Barra Lateral - Filtros
             st.sidebar.header("🔍 Filtros")
             
-            # --- FILTRO POR FECHA ÚNICA ---
-            if not df.empty:
-                default_date = df["Fecha_DT"].max().date()
-            else:
-                default_date = datetime.date.today()
-
-            selected_date = st.sidebar.date_input(
-                "Fecha Específica",
-                value=default_date,
-                min_value=datetime.date(2020, 1, 1),
-                max_value=datetime.date(2030, 12, 31),
-                format="DD/MM/YYYY"
+            # --- MODALIDAD DE FILTRADO (FECHA O SEMANA) ---
+            modo_filtro = st.sidebar.radio(
+                "Filtrar por:",
+                options=["Fecha Específica", "Semana del Año", "Todas las Fechas"],
+                index=0
             )
-            # ------------------------------
 
+            # Controles según la modalidad elegida
+            selected_date = None
+            selected_semanas = []
+
+            if modo_filtro == "Fecha Específica":
+                default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
+                selected_date = st.sidebar.date_input(
+                    "Selecciona Fecha",
+                    value=default_date,
+                    min_value=datetime.date(2020, 1, 1),
+                    max_value=datetime.date(2030, 12, 31),
+                    format="DD/MM/YYYY"
+                )
+
+            # Filtros generales: Año y Mes
             anios_opt = sorted(df["Año"].unique(), reverse=True)
             selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt)
 
             meses_opt = df[df["Año"].isin(selected_anios)].sort_values("Mes_Num")["Mes"].unique().tolist()
             selected_meses = st.sidebar.multiselect("Mes", options=meses_opt, default=meses_opt)
 
-            semanas_opt = sorted(df[(df["Año"].isin(selected_anios)) & (df["Mes"].isin(selected_meses))]["Semana"].unique())
-            selected_semanas = st.sidebar.multiselect("Semana del Año", options=semanas_opt, default=semanas_opt)
+            if modo_filtro == "Semana del Año":
+                semanas_opt = sorted(df[(df["Año"].isin(selected_anios)) & (df["Mes"].isin(selected_meses))]["Semana"].unique())
+                selected_semanas = st.sidebar.multiselect("Semana del Año", options=semanas_opt, default=semanas_opt)
 
             ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
             selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt)
 
-            # Aplicar Filtros generales
+            # --- CONSTRUCCIÓN DE LA MÁSCARA DE FILTRADO ---
             mask = (
                 (df["Año"].isin(selected_anios)) &
                 (df["Mes"].isin(selected_meses)) &
-                (df["Semana"].isin(selected_semanas)) &
                 (df["CIUDAD"].isin(selected_ciudades))
             )
 
-            # Aplicar filtro por la fecha única seleccionada
-            if selected_date:
+            # Aplicar filtro dinámico según la opción seleccionada
+            if modo_filtro == "Fecha Específica" and selected_date:
                 mask = mask & (df["Fecha_DT"].dt.date == selected_date)
+            elif modo_filtro == "Semana del Año" and selected_semanas:
+                mask = mask & (df["Semana"].isin(selected_semanas))
 
             df_filtered = df[mask]
 
