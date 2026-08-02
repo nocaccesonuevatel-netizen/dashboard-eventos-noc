@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import datetime
 
 st.set_page_config(page_title="Gestión de Eventos Pendientes", page_icon="🚨", layout="wide")
 
@@ -17,7 +18,7 @@ if uploaded_file is not None:
         # Identificar la columna AG (posición 32 de base 0, la 33ª columna)
         col_ag_nombre = None
         if len(df_raw.columns) >= 33:
-            col_ag_nombre = df_raw.columns[32]  # Toma el nombre exacto de la columna AG
+            col_ag_nombre = df_raw.columns[32]
         
         # Columnas requeridas
         columnas_deseadas = [
@@ -36,7 +37,6 @@ if uploaded_file is not None:
 
             # --- FILTRO POR ESTADO (COLUMNA AG == PENDIENTE) ---
             if col_ag_nombre:
-                # Filtrar solo aquellos cuya columna AG sea igual a "PENDIENTE"
                 df = df[df[col_ag_nombre].astype(str).str.strip().str.upper() == "PENDIENTE"]
             # --------------------------------------------------
 
@@ -59,20 +59,22 @@ if uploaded_file is not None:
             # Barra Lateral - Filtros
             st.sidebar.header("🔍 Filtros")
             
-            # Filtro por Rango de Fechas
+            # --- RANGO DE FECHAS CORREGIDO Y FLEXIBLE ---
             if not df.empty:
-                min_date = df["Fecha_DT"].min().date()
-                max_date = df["Fecha_DT"].max().date()
-                
-                date_range = st.sidebar.date_input(
-                    "Rango de Fechas",
-                    value=(min_date, max_date),
-                    min_value=min_date,
-                    max_value=max_date,
-                    format="DD/MM/YYYY"
-                )
+                min_detected = df["Fecha_DT"].min().date()
+                max_detected = df["Fecha_DT"].max().date()
+                default_value = (min_detected, max_detected)
             else:
-                date_range = None
+                default_value = (datetime.date(2024, 1, 1), datetime.date(2026, 12, 31))
+
+            date_range = st.sidebar.date_input(
+                "Rango de Fechas",
+                value=default_value,
+                min_value=datetime.date(2020, 1, 1),
+                max_value=datetime.date(2030, 12, 31),
+                format="DD/MM/YYYY"
+            )
+            # --------------------------------------------
 
             anios_opt = sorted(df["Año"].unique(), reverse=True)
             selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt)
