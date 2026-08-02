@@ -59,22 +59,20 @@ if uploaded_file is not None:
             # Barra Lateral - Filtros
             st.sidebar.header("🔍 Filtros")
             
-            # --- RANGO DE FECHAS CORREGIDO Y FLEXIBLE ---
+            # --- FILTRO POR FECHA ÚNICA ---
             if not df.empty:
-                min_detected = df["Fecha_DT"].min().date()
-                max_detected = df["Fecha_DT"].max().date()
-                default_value = (min_detected, max_detected)
+                default_date = df["Fecha_DT"].max().date()
             else:
-                default_value = (datetime.date(2024, 1, 1), datetime.date(2026, 12, 31))
+                default_date = datetime.date.today()
 
-            date_range = st.sidebar.date_input(
-                "Rango de Fechas",
-                value=default_value,
+            selected_date = st.sidebar.date_input(
+                "Fecha Específica",
+                value=default_date,
                 min_value=datetime.date(2020, 1, 1),
                 max_value=datetime.date(2030, 12, 31),
                 format="DD/MM/YYYY"
             )
-            # --------------------------------------------
+            # ------------------------------
 
             anios_opt = sorted(df["Año"].unique(), reverse=True)
             selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt)
@@ -96,10 +94,9 @@ if uploaded_file is not None:
                 (df["CIUDAD"].isin(selected_ciudades))
             )
 
-            # Validar rango de fechas
-            if date_range and isinstance(date_range, tuple) and len(date_range) == 2:
-                start_date, end_date = date_range
-                mask = mask & (df["Fecha_DT"].dt.date >= start_date) & (df["Fecha_DT"].dt.date <= end_date)
+            # Aplicar filtro por la fecha única seleccionada
+            if selected_date:
+                mask = mask & (df["Fecha_DT"].dt.date == selected_date)
 
             df_filtered = df[mask]
 
