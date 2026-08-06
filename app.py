@@ -96,7 +96,7 @@ with tab_pendientes:
                 selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt, key="anios_pend")
 
                 meses_opt = df[df["Año"].isin(selected_anios)].sort_values("Mes_Num")["Mes"].unique().tolist()
-                selected_meses = st.sidebar.multiselect("Mes", options=meses_opt, default=meses_opt, key="meses_pend")
+                selected_meses = st.sidebar.multiselect("Mes", options=meses_opt, defaultmeses_opt, key="meses_pend")
 
                 if modo_filtro == "Semana del Año":
                     semanas_opt = sorted(df[(df["Año"].isin(selected_anios)) & (df["Mes"].isin(selected_meses))]["Semana"].unique())
@@ -259,32 +259,29 @@ with tab_matutino:
                 df_core_raw = pd.read_excel(uploaded_matutino)
                 df_core_raw.columns = [str(c).strip() for c in df_core_raw.columns]
 
-                # Identificar columna de Cronología (Columna P1 -> índice 15)
-                col_crono = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_core_raw.columns else df_core_raw.columns[15]
+                # Tomar la Columna C1 (Posición índice 2) para la Fecha de Inicio
+                col_fecha_c1 = df_core_raw.columns[2] if len(df_core_raw.columns) >= 3 else df_core_raw.columns[0]
+                df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha_c1], dayfirst=True, errors="coerce")
 
-                # Identificar y procesar columna de Fecha normalizando horas
-                col_fecha = "FECHA INICIO" if "FECHA INICIO" in df_core_raw.columns else df_core_raw.columns[0]
-                df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha], dayfirst=True, errors="coerce").dt.normalize()
-                
-                df_valido = df_core_raw.dropna(subset=["Fecha_DT"]).copy()
-
-                # Control de filtro por Fecha
+                # Selector de fecha tipo calendario
                 col_f1, col_f2 = st.columns([2, 1])
                 filtrar_por_fecha = col_f2.checkbox("Filtrar por fecha", value=True)
 
-                if filtrar_por_fecha and not df_valido.empty:
-                    # Extraer las fechas únicas disponibles formateadas para el selector
-                    fechas_disponibles = sorted(df_valido["Fecha_DT"].dt.date.unique(), reverse=True)
+                if filtrar_por_fecha and df_core_raw["Fecha_DT"].notna().any():
+                    min_fecha = df_core_raw["Fecha_DT"].min().date()
+                    max_fecha = df_core_raw["Fecha_DT"].max().date()
                     
-                    selected_date_core = col_f1.selectbox(
-                        "📅 Selecciona la Fecha del Reporte CORE:",
-                        options=fechas_disponibles,
-                        format_func=lambda d: d.strftime("%d/%m/%Y"),
-                        key="date_core_select"
+                    selected_date_core = col_f1.date_input(
+                        "📅 Mostrar eventos desde la Fecha (Columna C1):",
+                        value=min_fecha,
+                        min_value=min_fecha,
+                        max_value=max_fecha,
+                        format="DD/MM/YYYY",
+                        key="date_core_cal"
                     )
                     
-                    # Filtrar por la fecha seleccionada
-                    df_core_filtered = df_valido[df_valido["Fecha_DT"].dt.date == selected_date_core]
+                    # Filtra desde la fecha seleccionada en adelante
+                    df_core_filtered = df_core_raw[df_core_raw["Fecha_DT"].dt.date >= selected_date_core]
                 else:
                     df_core_filtered = df_core_raw.copy()
 
@@ -299,7 +296,10 @@ with tab_matutino:
                 hss_comfone = col_c4.text_input("HSS-COMFONE:", value="Ninguno")
                 otros = col_c5.text_input("OTROS:", value="Ninguno")
 
-                # Búsqueda flexible de palabras clave en CRONOLOGIA DEL EVENTO
+                # Identificar la columna P1 (índice 15) para la Cronología del Evento
+                col_crono = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_core_filtered.columns else df_core_filtered.columns[15]
+
+                # Búsqueda flexible de palabras clave
                 serie_crono = df_core_filtered[col_crono].dropna().astype(str)
 
                 dwdm_list = serie_crono[serie_crono.str.contains("DWDM", case=False, na=False)].tolist()
