@@ -303,10 +303,12 @@ with tab_matutino:
                 serie_crono = df_core_filtered[col_crono].dropna().astype(str)
 
                 dwdm_list = serie_crono[serie_crono.str.contains("DWDM", case=False, na=False)].tolist()
+                metro_list = serie_crono[serie_crono.str.contains("METRO", case=False, na=False)].tolist()
                 isp_list = serie_crono[serie_crono.str.contains("ISP", case=False, na=False)].tolist()
                 icx_list = serie_crono[serie_crono.str.contains("INTERCONEXI", case=False, na=False)].tolist()
 
                 txt_dwdm = "\n".join([f"-{val.strip()}" for val in dwdm_list]) if dwdm_list else "-NINGUNO"
+                txt_metro = "\n".join([f"-{val.strip()}" for val in metro_list]) if metro_list else "-NINGUNO"
                 txt_isp = "\n".join([f"-{val.strip()}" for val in isp_list]) if isp_list else "-Ninguno"
                 txt_icx = "\n".join([f"-{val.strip()}" for val in icx_list]) if icx_list else "- Ninguno"
 
@@ -317,6 +319,8 @@ with tab_matutino:
                     f"-SIN EVENTOS\n\n"
                     f"*Eventos DWDM:*\n"
                     f"{txt_dwdm}\n\n"
+                    f"*Eventos METRO:*\n"
+                    f"{txt_metro}\n\n"
                     f"*Eventos ISP:*\n"
                     f"{txt_isp}\n\n"
                     f"*Eventos ICX:*\n"
