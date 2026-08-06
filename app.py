@@ -96,7 +96,7 @@ with tab_pendientes:
                 selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt, key="anios_pend")
 
                 meses_opt = df[df["Año"].isin(selected_anios)].sort_values("Mes_Num")["Mes"].unique().tolist()
-                selected_meses = st.sidebar.multiselect("Mes", options=meses_opt, defaultmeses_opt, key="meses_pend")
+                selected_meses = st.sidebar.multiselect("Mes", options=meses_opt, default=meses_opt, key="meses_pend")
 
                 if modo_filtro == "Semana del Año":
                     semanas_opt = sorted(df[(df["Año"].isin(selected_anios)) & (df["Mes"].isin(selected_meses))]["Semana"].unique())
