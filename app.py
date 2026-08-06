@@ -214,9 +214,9 @@ with tab_matutino:
                 col_crit = df_acc.columns[4] if len(df_acc.columns) >= 5 else "CRITICIDAD"
                 col_crono = df_acc.columns[15] if len(df_acc.columns) >= 16 else "CRONOLOGIA DEL EVENTO"
 
-                # Obtener la columna de Fecha de Inicio (columna C1)
+                # Obtener la columna de Fecha de Inicio (columna C1) solo con [DD/MM/YYYY]
                 col_fecha_acc = df_acc.columns[2] if len(df_acc.columns) >= 3 else df_acc.columns[0]
-                df_acc["Fecha_Formateada"] = pd.to_datetime(df_acc[col_fecha_acc], dayfirst=True, errors="coerce").dt.strftime("[%d/%m/%Y %H:%M]")
+                df_acc["Fecha_Formateada"] = pd.to_datetime(df_acc[col_fecha_acc], dayfirst=True, errors="coerce").dt.strftime("[%d/%m/%Y]")
                 df_acc["Fecha_Formateada"] = df_acc["Fecha_Formateada"].fillna("")
 
                 # Filtrar Críticos y Mayores
@@ -268,8 +268,8 @@ with tab_matutino:
                 col_fecha_c1 = df_core_raw.columns[2] if len(df_core_raw.columns) >= 3 else df_core_raw.columns[0]
                 df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha_c1], dayfirst=True, errors="coerce")
                 
-                # Crear texto legible de fecha/hora de inicio [DD/MM/YYYY HH:MM]
-                df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_DT"].dt.strftime("[%d/%m/%Y %H:%M]")
+                # Crear texto legible solo de fecha de inicio [DD/MM/YYYY]
+                df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_DT"].dt.strftime("[%d/%m/%Y]")
                 df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_Texto"].fillna("")
 
                 # Selector de fecha tipo calendario
@@ -308,7 +308,7 @@ with tab_matutino:
                 # Identificar la columna P1 (índice 15) para la Cronología del Evento
                 col_crono = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_core_filtered.columns else df_core_filtered.columns[15]
 
-                # Búsqueda flexible de palabras clave incluyendo la fecha de inicio
+                # Búsqueda flexible de palabras clave incluyendo únicamente la fecha de inicio
                 df_valid_crono = df_core_filtered.dropna(subset=[col_crono]).copy()
                 df_valid_crono["Crono_Str"] = df_valid_crono[col_crono].astype(str)
 
