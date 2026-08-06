@@ -214,13 +214,18 @@ with tab_matutino:
                 col_crit = df_acc.columns[4] if len(df_acc.columns) >= 5 else "CRITICIDAD"
                 col_crono = df_acc.columns[15] if len(df_acc.columns) >= 16 else "CRONOLOGIA DEL EVENTO"
 
+                # Obtener la columna de Fecha de Inicio (columna C1)
+                col_fecha_acc = df_acc.columns[2] if len(df_acc.columns) >= 3 else df_acc.columns[0]
+                df_acc["Fecha_Formateada"] = pd.to_datetime(df_acc[col_fecha_acc], dayfirst=True, errors="coerce").dt.strftime("[%d/%m/%Y %H:%M]")
+                df_acc["Fecha_Formateada"] = df_acc["Fecha_Formateada"].fillna("")
+
                 # Filtrar Críticos y Mayores
                 df_criticos = df_acc[df_acc[col_crit].astype(str).str.strip().str.upper() == "ALTA"]
                 df_mayores = df_acc[df_acc[col_crit].astype(str).str.strip().str.upper() == "MEDIA"]
 
-                # Extraer Cronología
-                txt_criticos = "\n".join([f"-{val}" for val in df_criticos[col_crono].dropna().astype(str)]) if not df_criticos.empty else "-NINGUNO"
-                txt_mayores = "\n".join([f"-{val}" for val in df_mayores[col_crono].dropna().astype(str)]) if not df_mayores.empty else "-NINGUNO"
+                # Extraer Cronología con Fecha de Inicio
+                txt_criticos = "\n".join([f"-{row['Fecha_Formateada']} {row[col_crono]}" for _, row in df_criticos.iterrows() if pd.notna(row[col_crono])]) if not df_criticos.empty else "-NINGUNO"
+                txt_mayores = "\n".join([f"-{row['Fecha_Formateada']} {row[col_crono]}" for _, row in df_mayores.iterrows() if pd.notna(row[col_crono])]) if not df_mayores.empty else "-NINGUNO"
 
                 # Generar Mensaje WhatsApp con negritas
                 msg_acc = (
@@ -262,6 +267,10 @@ with tab_matutino:
                 # Tomar la Columna C1 (Posición índice 2) para la Fecha de Inicio
                 col_fecha_c1 = df_core_raw.columns[2] if len(df_core_raw.columns) >= 3 else df_core_raw.columns[0]
                 df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha_c1], dayfirst=True, errors="coerce")
+                
+                # Crear texto legible de fecha/hora de inicio [DD/MM/YYYY HH:MM]
+                df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_DT"].dt.strftime("[%d/%m/%Y %H:%M]")
+                df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_Texto"].fillna("")
 
                 # Selector de fecha tipo calendario
                 col_f1, col_f2 = st.columns([2, 1])
@@ -299,18 +308,19 @@ with tab_matutino:
                 # Identificar la columna P1 (índice 15) para la Cronología del Evento
                 col_crono = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_core_filtered.columns else df_core_filtered.columns[15]
 
-                # Búsqueda flexible de palabras clave
-                serie_crono = df_core_filtered[col_crono].dropna().astype(str)
+                # Búsqueda flexible de palabras clave incluyendo la fecha de inicio
+                df_valid_crono = df_core_filtered.dropna(subset=[col_crono]).copy()
+                df_valid_crono["Crono_Str"] = df_valid_crono[col_crono].astype(str)
 
-                dwdm_list = serie_crono[serie_crono.str.contains("DWDM", case=False, na=False)].tolist()
-                metro_list = serie_crono[serie_crono.str.contains("METRO", case=False, na=False)].tolist()
-                isp_list = serie_crono[serie_crono.str.contains("ISP", case=False, na=False)].tolist()
-                icx_list = serie_crono[serie_crono.str.contains("INTERCONEXI", case=False, na=False)].tolist()
+                dwdm_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("DWDM", case=False, na=False)]
+                metro_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("METRO", case=False, na=False)]
+                isp_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("ISP", case=False, na=False)]
+                icx_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("INTERCONEXI", case=False, na=False)]
 
-                txt_dwdm = "\n".join([f"-{val.strip()}" for val in dwdm_list]) if dwdm_list else "-NINGUNO"
-                txt_metro = "\n".join([f"-{val.strip()}" for val in metro_list]) if metro_list else "-NINGUNO"
-                txt_isp = "\n".join([f"-{val.strip()}" for val in isp_list]) if isp_list else "-Ninguno"
-                txt_icx = "\n".join([f"-{val.strip()}" for val in icx_list]) if icx_list else "- Ninguno"
+                txt_dwdm = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in dwdm_df.iterrows()]) if not dwdm_df.empty else "-NINGUNO"
+                txt_metro = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in metro_df.iterrows()]) if not metro_df.empty else "-NINGUNO"
+                txt_isp = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in isp_df.iterrows()]) if not isp_df.empty else "-Ninguno"
+                txt_icx = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in icx_df.iterrows()]) if not icx_df.empty else "- Ninguno"
 
                 # Generar Mensaje WhatsApp con negritas (*texto*)
                 msg_core = (
