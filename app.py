@@ -259,26 +259,32 @@ with tab_matutino:
                 df_core_raw = pd.read_excel(uploaded_matutino)
                 df_core_raw.columns = [str(c).strip() for c in df_core_raw.columns]
 
-                # Identificar columna de Cronología
+                # Identificar columna de Cronología (Columna P1 -> índice 15)
                 col_crono = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_core_raw.columns else df_core_raw.columns[15]
 
-                # Procesar columna de Fecha
+                # Identificar y procesar columna de Fecha normalizando horas
                 col_fecha = "FECHA INICIO" if "FECHA INICIO" in df_core_raw.columns else df_core_raw.columns[0]
-                df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha], dayfirst=True, errors="coerce")
+                df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha], dayfirst=True, errors="coerce").dt.normalize()
                 
+                df_valido = df_core_raw.dropna(subset=["Fecha_DT"]).copy()
+
                 # Control de filtro por Fecha
                 col_f1, col_f2 = st.columns([2, 1])
                 filtrar_por_fecha = col_f2.checkbox("Filtrar por fecha", value=True)
 
-                if filtrar_por_fecha and df_core_raw["Fecha_DT"].notna().any():
-                    default_date_core = df_core_raw["Fecha_DT"].max().date()
-                    selected_date_core = col_f1.date_input(
+                if filtrar_por_fecha and not df_valido.empty:
+                    # Extraer las fechas únicas disponibles formateadas para el selector
+                    fechas_disponibles = sorted(df_valido["Fecha_DT"].dt.date.unique(), reverse=True)
+                    
+                    selected_date_core = col_f1.selectbox(
                         "📅 Selecciona la Fecha del Reporte CORE:",
-                        value=default_date_core,
-                        format="DD/MM/YYYY",
-                        key="date_core"
+                        options=fechas_disponibles,
+                        format_func=lambda d: d.strftime("%d/%m/%Y"),
+                        key="date_core_select"
                     )
-                    df_core_filtered = df_core_raw[df_core_raw["Fecha_DT"].dt.date == selected_date_core]
+                    
+                    # Filtrar por la fecha seleccionada
+                    df_core_filtered = df_valido[df_valido["Fecha_DT"].dt.date == selected_date_core]
                 else:
                     df_core_filtered = df_core_raw.copy()
 
