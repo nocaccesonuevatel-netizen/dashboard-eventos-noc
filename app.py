@@ -245,9 +245,11 @@ with tab_matutino:
                 col_fecha_c1 = df_core_raw.columns[2] if len(df_core_raw.columns) >= 3 else df_core_raw.columns[0]
                 df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha_c1], dayfirst=True, errors="coerce")
                 
-                # Crear texto legible solo de fecha de inicio [DD/MM/YYYY]
-                df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_DT"].dt.strftime("[%d/%m/%Y]")
-                df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_Texto"].fillna("")
+              # --- FILTRO EXCLUSIVO DEL AÑO 2026 EN ADELANTE ---
+                df_core_raw = df_core_raw[df_core_raw["Fecha_DT"].dt.year >= 2026]
+
+                if df_core_raw.empty:
+                    st.warning("⚠️ No se encontraron registros en RED CORE del año 2026 en adelante.")
 
                 # Selector de fecha tipo calendario
                 col_f1, col_f2 = st.columns([2, 1])
