@@ -67,7 +67,6 @@ with tab_pendientes:
                     st.sidebar.header("🔍 Filtros (Pendientes)")
                     
                     min_f = df["Fecha_DT"].min().date()
-                    max_f = df["Fecha_DT"].max().date()
 
                     selected_date = st.sidebar.date_input(
                         "Mostrar eventos desde esta fecha en adelante:",
@@ -140,7 +139,6 @@ with tab_pendientes:
 
                         texto_whatsapp = "\n".join(lineas_reporte)
                         
-                        # Usar clave dinámica basada en la fecha para forzar la actualización inmediata en pantalla
                         st.text_area(
                             "Copia el siguiente texto para enviarlo por WhatsApp:", 
                             texto_whatsapp, 
@@ -254,14 +252,23 @@ with tab_matutino:
                 filtrar_por_fecha = col_f2.checkbox("Filtrar por fecha", value=True)
 
                 if filtrar_por_fecha and df_core_raw["Fecha_DT"].notna().any():
-                    min_fecha = df_core_raw["Fecha_DT"].min().date()
-                    max_fecha = df_core_raw["Fecha_DT"].max().date()
+                    # Definir el rango permitido del calendario strictly para el año 2026
+                    min_permitido = datetime.date(2026, 1, 1)
+                    max_permitido = datetime.date(2026, 12, 31)
+
+                    # Obtener la primera fecha disponible del DataFrame dentro de 2026
+                    min_f_df = df_core_raw["Fecha_DT"].min().date()
+                    
+                    # Establecer el valor inicial sin salir de los límites de 2026
+                    val_inicial = min_f_df if min_f_df >= min_permitido else min_permitido
+                    if val_inicial > max_permitido:
+                        val_inicial = max_permitido
                     
                     selected_date_core = col_f1.date_input(
                         "📅 Mostrar eventos desde la Fecha (Columna C1):",
-                        value=min_fecha,
-                        min_value=min_fecha,
-                        max_value=max_fecha,
+                        value=val_inicial,
+                        min_value=min_permitido,
+                        max_value=max_permitido,
                         format="DD/MM/YYYY",
                         key="date_core_cal"
                     )
