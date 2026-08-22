@@ -67,7 +67,6 @@ with tab_pendientes:
                     st.sidebar.header("🔍 Filtros (Pendientes)")
                     
                     min_f = df["Fecha_DT"].min().date()
-                    max_f = df["Fecha_DT"].max().date()
 
                     selected_date = st.sidebar.date_input(
                         "Mostrar eventos desde esta fecha en adelante:",
@@ -106,7 +105,7 @@ with tab_pendientes:
                     df_display["FECHA INICIO"] = df_filtered["Fecha_DT"].dt.strftime("%d-%m-%Y")
                     st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-                    # Módulo WhatsApp Sincronizado
+                    # Módulo WhatsApp Sincronizado + Botón Copiar
                     st.markdown("---")
                     st.subheader("📲 Reporte para WhatsApp")
 
@@ -140,13 +139,8 @@ with tab_pendientes:
 
                         texto_whatsapp = "\n".join(lineas_reporte)
                         
-                        # Usar clave dinámica basada en la fecha para forzar la actualización inmediata en pantalla
-                        st.text_area(
-                            "Copia el siguiente texto para enviarlo por WhatsApp:", 
-                            texto_whatsapp, 
-                            height=300, 
-                            key=f"txt_wa_pend_{selected_date}_{len(df_filtered)}"
-                        )
+                        st.info("💡 **Tip:** Haz clic en el icono 📋 que aparece arriba a la derecha del recuadro para copiar todo el texto al instante.")
+                        st.code(texto_whatsapp, language=None)
                     else:
                         st.warning("No hay eventos que coincidan con los filtros seleccionados.")
 
@@ -223,7 +217,8 @@ with tab_matutino:
                 )
 
                 st.subheader("📲 Reporte para WhatsApp (RED ACCESO)")
-                st.text_area("Copia el texto generado:", msg_acc, height=350)
+                st.info("💡 **Tip:** Haz clic en el icono 📋 que aparece arriba a la derecha del recuadro para copiar todo el texto al instante.")
+                st.code(msg_acc, language=None)
 
             except Exception as e:
                 st.error(f"Error al procesar el archivo de ACCESO: {e}")
@@ -325,7 +320,8 @@ with tab_matutino:
                 )
 
                 st.subheader("📲 Reporte para WhatsApp (RED CORE)")
-                st.text_area("Copia el texto generado:", msg_core, height=380)
+                st.info("💡 **Tip:** Haz clic en el icono 📋 que aparece arriba a la derecha del recuadro para copiar todo el texto al instante.")
+                st.code(msg_core, language=None)
 
             except Exception as e:
                 st.error(f"Error al procesar el archivo de CORE: {e}")
