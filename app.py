@@ -16,7 +16,7 @@ tab_pendientes, tab_matutino = st.tabs([
 # MÓDULO 1: REPORTE DE EVENTOS PENDIENTES
 # ==============================================================================
 with tab_pendientes:
-    st.title("🚨 Gestión y Reporte de Eventos Pendientes")
+    st.title("🚨 Gestión y Reporte de Eventos Pendientes (Año 2026)")
 
     uploaded_file = st.sidebar.file_uploader("Cargar Excel (Pendientes)", type=["xlsx", "xls"], key="uploader_pendientes")
 
@@ -50,128 +50,96 @@ with tab_pendientes:
                 # --- FILTRO POR ESTADO (COLUMNA AG == PENDIENTE) ---
                 if col_ag_nombre:
                     df = df[df[col_ag_nombre].astype(str).str.strip().str.upper() == "PENDIENTE"]
-                # --------------------------------------------------
 
                 df = df[cols_existentes].copy()
 
-                # Procesamiento de Fechas
+                # Procesamiento y Limpieza de Fechas
                 df["Fecha_DT"] = pd.to_datetime(df["FECHA INICIO"], dayfirst=True, errors="coerce")
                 df = df.dropna(subset=["Fecha_DT"])
 
-                df["Año"] = df["Fecha_DT"].dt.year
-                df["Mes_Num"] = df["Fecha_DT"].dt.month
+                # --- FILTRAR ÚNICAMENTE INFORMACIÓN DEL 2026 ---
+                df = df[df["Fecha_DT"].dt.year == 2026]
 
-                meses_es = {
-                    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
-                    7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
-                }
-                df["Mes"] = df["Mes_Num"].map(meses_es)
-                df["Semana"] = df["Fecha_DT"].dt.isocalendar().week
+                if df.empty:
+                    st.warning("⚠️ No se encontraron eventos pendientes correspondientes al año 2026.")
+                else:
+                    # Barra Lateral - Filtro por Fecha
+                    st.sidebar.header("🔍 Filtros (Pendientes)")
+                    
+                    min_f = df["Fecha_DT"].min().date()
+                    max_f = df["Fecha_DT"].max().date()
 
-                # Barra Lateral - Filtros Módulo 1
-                st.sidebar.header("🔍 Filtros (Pendientes)")
-                
-                modo_filtro = st.sidebar.radio(
-                    "Filtrar por:",
-                    options=["Fecha Específica", "Semana del Año", "Todas las Fechas"],
-                    index=0,
-                    key="modo_filtro_pendientes"
-                )
-
-                selected_date = None
-                selected_semanas = []
-
-                if modo_filtro == "Fecha Específica":
-                    default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
                     selected_date = st.sidebar.date_input(
-                        "Selecciona Fecha",
-                        value=default_date,
-                        min_value=datetime.date(2020, 1, 1),
-                        max_value=datetime.date(2030, 12, 31),
+                        "Mostrar eventos desde esta fecha en adelante:",
+                        value=min_f,
+                        min_value=datetime.date(2026, 1, 1),
+                        max_value=datetime.date(2026, 12, 31),
                         format="DD/MM/YYYY",
                         key="date_pendientes"
                     )
 
-                anios_opt = sorted(df["Año"].unique(), reverse=True)
-                selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt, key="anios_pend")
+                    ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
+                    selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt, key="ciudades_pend")
 
-                meses_opt = df[df["Año"].isin(selected_anios)].sort_values("Mes_Num")["Mes"].unique().tolist()
-                selected_meses = st.sidebar.multiselect("Mes", options=meses_opt, default=meses_opt, key="meses_pend")
+                    # Aplicar Máscara de Filtro (Fecha en adelante + Ciudades)
+                    mask = (df["Fecha_DT"].dt.date >= selected_date) & (df["CIUDAD"].isin(selected_ciudades))
+                    df_filtered = df[mask].copy()
 
-                if modo_filtro == "Semana del Año":
-                    semanas_opt = sorted(df[(df["Año"].isin(selected_anios)) & (df["Mes"].isin(selected_meses))]["Semana"].unique())
-                    selected_semanas = st.sidebar.multiselect("Semana del Año", options=semanas_opt, default=semanas_opt, key="semanas_pend")
+                    # Visualización KPIs y Tabla
+                    st.subheader("📊 Resumen General")
+                    col1, col2 = st.columns(2)
+                    col1.metric("Total Eventos Pendientes", len(df_filtered))
 
-                ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
-                selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt, key="ciudades_pend")
+                    desglose = {}
+                    if not df_filtered.empty and "IMPACTO" in df_filtered.columns:
+                        desglose = df_filtered["IMPACTO"].value_counts().to_dict()
+                        texto_impacto = " | ".join([f"**{k}:** {v}" for k, v in desglose.items()])
+                        col2.markdown(f"**Desglose por Impacto:**\n\n{texto_impacto}")
 
-                mask = (
-                    (df["Año"].isin(selected_anios)) &
-                    (df["Mes"].isin(selected_meses)) &
-                    (df["CIUDAD"].isin(selected_ciudades))
-                )
-
-                if modo_filtro == "Fecha Específica" and selected_date:
-                    mask = mask & (df["Fecha_DT"].dt.date == selected_date)
-                elif modo_filtro == "Semana del Año" and selected_semanas:
-                    mask = mask & (df["Semana"].isin(selected_semanas))
-
-                df_filtered = df[mask]
-
-                # Visualización KPIs y Tabla
-                st.subheader("📊 Resumen General")
-                col1, col2 = st.columns(2)
-                col1.metric("Total Eventos Pendientes", len(df_filtered))
-
-                if not df_filtered.empty and "IMPACTO" in df_filtered.columns:
-                    desglose = df_filtered["IMPACTO"].value_counts().to_dict()
-                    texto_impacto = " | ".join([f"**{k}:** {v}" for k, v in desglose.items()])
-                    col2.markdown(f"**Desglose por Impacto:**\n\n{texto_impacto}")
-
-                st.markdown("---")
-                st.subheader("📋 Detalle de Eventos Filtrados")
-                
-                df_display = df_filtered[cols_existentes].copy()
-                df_display["FECHA INICIO"] = df_filtered["Fecha_DT"].dt.strftime("%d-%m-%Y")
-                st.dataframe(df_display, use_container_width=True, hide_index=True)
-
-                # Módulo WhatsApp
-                st.markdown("---")
-                st.subheader("📲 Reporte para WhatsApp")
-
-                if not df_filtered.empty:
-                    lineas_reporte = []
-                    lineas_reporte.append("🚨 *REPORTE DE EVENTOS PENDIENTES* 🚨\n")
-                    lineas_reporte.append(f"📊 *Total Pendientes:* {len(df_filtered)}")
+                    st.markdown("---")
+                    st.subheader("📋 Detalle de Eventos Filtrados")
                     
-                    if "IMPACTO" in df_filtered.columns:
-                        desglose_txt = ", ".join([f"{k}: {v}" for k, v in desglose.items()])
-                        lineas_reporte.append(f"📌 *Impacto:* {desglose_txt}")
-                    
-                    lineas_reporte.append("-----------------------------------")
+                    df_display = df_filtered[cols_existentes].copy()
+                    df_display["FECHA INICIO"] = df_filtered["Fecha_DT"].dt.strftime("%d-%m-%Y")
+                    st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-                    for ciudad, grupo in df_filtered.groupby("CIUDAD"):
-                        lineas_reporte.append(f"\n📍 *CIUDAD: {str(ciudad).upper()}* ({len(grupo)})")
+                    # Módulo WhatsApp Optimizado
+                    st.markdown("---")
+                    st.subheader("📲 Reporte para WhatsApp")
+
+                    if not df_filtered.empty:
+                        lineas_reporte = []
+                        lineas_reporte.append("🚨 *REPORTE DE EVENTOS PENDIENTES (2026)* 🚨\n")
+                        lineas_reporte.append(f"📊 *Total Pendientes:* {len(df_filtered)}")
                         
-                        for idx, row in grupo.iterrows():
-                            fecha_str = row["Fecha_DT"].strftime("%d/%m/%Y")
-                            hora_str = str(row.get("HORA INICIO", "N/I"))[:5]
-                            zona = row.get("ZONA AFECTADA", "N/A")
-                            impacto = row.get("IMPACTO", "N/A")
-                            causa = row.get("CAUSA PRELIMINAR", "N/A")
-                            cell_id = row.get("CELL ID", "N/A")
-                            
-                            lineas_reporte.append(
-                                f"• *{zona}*"
-                                f"\n  └ 🗓️ {fecha_str} {hora_str} | ⚠️ {impacto}"
-                                f"\n  └ 📡 *CELL ID:* {cell_id}"
-                                f"\n  └ 🔍 *Causa:* {causa}"
-                            )
+                        if desglose:
+                            desglose_txt = ", ".join([f"{k}: {v}" for k, v in desglose.items()])
+                            lineas_reporte.append(f"📌 *Impacto:* {desglose_txt}")
+                        
+                        lineas_reporte.append("-----------------------------------")
 
-                    texto_whatsapp = "\n".join(lineas_reporte)
-                    st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=300, key="txt_wa_pend")
-                else:
-                    st.warning("No hay eventos que coincidan con los filtros seleccionados.")
+                        for ciudad, grupo in df_filtered.groupby("CIUDAD"):
+                            lineas_reporte.append(f"\n📍 *CIUDAD: {str(ciudad).upper()}* ({len(grupo)})")
+                            
+                            for _, row in grupo.iterrows():
+                                fecha_str = row["Fecha_DT"].strftime("%d/%m/%Y")
+                                hora_str = str(row.get("HORA INICIO", "N/I"))[:5]
+                                zona = row.get("ZONA AFECTADA", "N/A")
+                                impacto = row.get("IMPACTO", "N/A")
+                                causa = row.get("CAUSA PRELIMINAR", "N/A")
+                                cell_id = row.get("CELL ID", "N/A")
+                                
+                                lineas_reporte.append(
+                                    f"• *{zona}*"
+                                    f"\n  └ 🗓️ {fecha_str} {hora_str} | ⚠️ {impacto}"
+                                    f"\n  └ 📡 *CELL ID:* {cell_id}"
+                                    f"\n  └ 🔍 *Causa:* {causa}"
+                                )
+
+                        texto_whatsapp = "\n".join(lineas_reporte)
+                        st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=300, key="txt_wa_pend")
+                    else:
+                        st.warning("No hay eventos que coincidan con los filtros seleccionados.")
 
         except Exception as e:
             st.error(f"Error al procesar el archivo: {e}")
