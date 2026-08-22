@@ -67,7 +67,6 @@ with tab_pendientes:
                     st.sidebar.header("🔍 Filtros (Pendientes)")
                     
                     min_f = df["Fecha_DT"].min().date()
-                    max_f = df["Fecha_DT"].max().date()
 
                     selected_date = st.sidebar.date_input(
                         "Mostrar eventos desde esta fecha en adelante:",
@@ -140,13 +139,8 @@ with tab_pendientes:
 
                         texto_whatsapp = "\n".join(lineas_reporte)
                         
-                        # Usar clave dinámica basada en la fecha para forzar la actualización inmediata en pantalla
-                        st.text_area(
-                            "Copia el siguiente texto para enviarlo por WhatsApp:", 
-                            texto_whatsapp, 
-                            height=300, 
-                            key=f"txt_wa_pend_{selected_date}_{len(df_filtered)}"
-                        )
+                        st.info("💡 **Tip:** Haz clic en el icono 📋 arriba a la derecha del recuadro para copiar.")
+                        st.code(texto_whatsapp, language=None)
                     else:
                         st.warning("No hay eventos que coincidan con los filtros seleccionados.")
 
@@ -223,7 +217,8 @@ with tab_matutino:
                 )
 
                 st.subheader("📲 Reporte para WhatsApp (RED ACCESO)")
-                st.text_area("Copia el texto generado:", msg_acc, height=350)
+                st.info("💡 **Tip:** Haz clic en el icono 📋 arriba a la derecha del recuadro para copiar.")
+                st.code(msg_acc, language=None)
 
             except Exception as e:
                 st.error(f"Error al procesar el archivo de ACCESO: {e}")
@@ -245,87 +240,97 @@ with tab_matutino:
                 col_fecha_c1 = df_core_raw.columns[2] if len(df_core_raw.columns) >= 3 else df_core_raw.columns[0]
                 df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha_c1], dayfirst=True, errors="coerce")
                 
-                # Crear texto legible solo de fecha de inicio [DD/MM/YYYY]
-                df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_DT"].dt.strftime("[%d/%m/%Y]")
-                df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_Texto"].fillna("")
+                # --- FILTRO EXCLUSIVO DEL AÑO 2026 EN ADELANTE ---
+                df_core_raw = df_core_raw[df_core_raw["Fecha_DT"].dt.year >= 2026]
 
-                # Selector de fecha tipo calendario
-                col_f1, col_f2 = st.columns([2, 1])
-                filtrar_por_fecha = col_f2.checkbox("Filtrar por fecha", value=True)
-
-                if filtrar_por_fecha and df_core_raw["Fecha_DT"].notna().any():
-                    min_fecha = df_core_raw["Fecha_DT"].min().date()
-                    max_fecha = df_core_raw["Fecha_DT"].max().date()
-                    
-                    selected_date_core = col_f1.date_input(
-                        "📅 Mostrar eventos desde la Fecha (Columna C1):",
-                        value=min_fecha,
-                        min_value=min_fecha,
-                        max_value=max_fecha,
-                        format="DD/MM/YYYY",
-                        key="date_core_cal"
-                    )
-                    
-                    # Filtra desde la fecha seleccionada en adelante
-                    df_core_filtered = df_core_raw[df_core_raw["Fecha_DT"].dt.date >= selected_date_core]
+                if df_core_raw.empty:
+                    st.warning("⚠️ No se encontraron registros en RED CORE del año 2026 en adelante.")
                 else:
-                    df_core_filtered = df_core_raw.copy()
+                    # Crear texto legible solo de fecha de inicio [DD/MM/YYYY]
+                    df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_DT"].dt.strftime("[%d/%m/%Y]")
+                    df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_Texto"].fillna("")
 
-                # Campos de entrada manual
-                st.markdown("---")
-                col_c1, col_c2 = st.columns(2)
-                alarmas_cortex = col_c1.text_input("Alarmas de CORTEX:", value="Ninguno")
-                trabajos_prog_core = col_c2.text_input("Trabajos Programados (Core):", value="Ninguno")
+                    # Selector de fecha tipo calendario
+                    col_f1, col_f2 = st.columns([2, 1])
+                    filtrar_por_fecha = col_f2.checkbox("Filtrar por fecha", value=True)
 
-                col_c3, col_c4, col_c5 = st.columns(3)
-                roaming = col_c3.text_input("ROAMING:", value="Ninguno")
-                hss_comfone = col_c4.text_input("HSS-COMFONE:", value="Ninguno")
-                otros = col_c5.text_input("OTROS:", value="Ninguno")
+                    if filtrar_por_fecha and df_core_raw["Fecha_DT"].notna().any():
+                        # Obtener fechas mínimas/máximas asegurando que no sean menores al 2026
+                        min_fecha_data = df_core_raw["Fecha_DT"].min().date()
+                        max_fecha_data = df_core_raw["Fecha_DT"].max().date()
 
-                # Identificar la columna P1 (índice 15) para la Cronología del Evento
-                col_crono = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_core_filtered.columns else df_core_filtered.columns[15]
+                        fecha_inicial_picker = max(min_fecha_data, datetime.date(2026, 1, 1))
 
-                # Búsqueda flexible de palabras clave incluyendo únicamente la fecha de inicio
-                df_valid_crono = df_core_filtered.dropna(subset=[col_crono]).copy()
-                df_valid_crono["Crono_Str"] = df_valid_crono[col_crono].astype(str)
+                        selected_date_core = col_f1.date_input(
+                            "📅 Mostrar eventos desde la Fecha (Columna C1):",
+                            value=fecha_inicial_picker,
+                            min_value=datetime.date(2026, 1, 1),
+                            max_value=datetime.date(2026, 12, 31),
+                            format="DD/MM/YYYY",
+                            key="date_core_cal"
+                        )
+                        
+                        # Filtra desde la fecha seleccionada en adelante
+                        df_core_filtered = df_core_raw[df_core_raw["Fecha_DT"].dt.date >= selected_date_core]
+                    else:
+                        df_core_filtered = df_core_raw.copy()
 
-                dwdm_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("DWDM", case=False, na=False)]
-                metro_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("METRO", case=False, na=False)]
-                isp_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("ISP", case=False, na=False)]
-                icx_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("INTERCONEXI", case=False, na=False)]
+                    # Campos de entrada manual
+                    st.markdown("---")
+                    col_c1, col_c2 = st.columns(2)
+                    alarmas_cortex = col_c1.text_input("Alarmas de CORTEX:", value="Ninguno")
+                    trabajos_prog_core = col_c2.text_input("Trabajos Programados (Core):", value="Ninguno")
 
-                txt_dwdm = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in dwdm_df.iterrows()]) if not dwdm_df.empty else "-NINGUNO"
-                txt_metro = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in metro_df.iterrows()]) if not metro_df.empty else "-NINGUNO"
-                txt_isp = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in isp_df.iterrows()]) if not isp_df.empty else "-Ninguno"
-                txt_icx = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in icx_df.iterrows()]) if not icx_df.empty else "- Ninguno"
+                    col_c3, col_c4, col_c5 = st.columns(3)
+                    roaming = col_c3.text_input("ROAMING:", value="Ninguno")
+                    hss_comfone = col_c4.text_input("HSS-COMFONE:", value="Ninguno")
+                    otros = col_c5.text_input("OTROS:", value="Ninguno")
 
-                # Generar Mensaje WhatsApp con negritas (*texto*)
-                msg_core = (
-                    f"Buenos dias Juanjo,\n\n"
-                    f"*Eventos de consideración RED CORE:*\n"
-                    f"-SIN EVENTOS\n\n"
-                    f"*Eventos DWDM:*\n"
-                    f"{txt_dwdm}\n\n"
-                    f"*Eventos METRO:*\n"
-                    f"{txt_metro}\n\n"
-                    f"*Eventos ISP:*\n"
-                    f"{txt_isp}\n\n"
-                    f"*Eventos ICX:*\n"
-                    f"{txt_icx}\n\n"
-                    f"*Alarmas de CORTEX:*\n"
-                    f"-{alarmas_cortex}\n\n"
-                    f"*Trabajos Programados:*\n"
-                    f"-{trabajos_prog_core}\n\n"
-                    f"*ROAMING:*\n"
-                    f"-{roaming}\n\n"
-                    f"*HSS-COMFONE:*\n"
-                    f"-{hss_comfone}\n\n"
-                    f"*OTROS:*\n"
-                    f"-{otros}"
-                )
+                    # Identificar la columna P1 (índice 15) para la Cronología del Evento
+                    col_crono = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_core_filtered.columns else df_core_filtered.columns[15]
 
-                st.subheader("📲 Reporte para WhatsApp (RED CORE)")
-                st.text_area("Copia el texto generado:", msg_core, height=380)
+                    # Búsqueda flexible de palabras clave incluyendo únicamente la fecha de inicio
+                    df_valid_crono = df_core_filtered.dropna(subset=[col_crono]).copy()
+                    df_valid_crono["Crono_Str"] = df_valid_crono[col_crono].astype(str)
+
+                    dwdm_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("DWDM", case=False, na=False)]
+                    metro_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("METRO", case=False, na=False)]
+                    isp_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("ISP", case=False, na=False)]
+                    icx_df = df_valid_crono[df_valid_crono["Crono_Str"].str.contains("INTERCONEXI", case=False, na=False)]
+
+                    txt_dwdm = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in dwdm_df.iterrows()]) if not dwdm_df.empty else "-NINGUNO"
+                    txt_metro = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in metro_df.iterrows()]) if not metro_df.empty else "-NINGUNO"
+                    txt_isp = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in isp_df.iterrows()]) if not isp_df.empty else "-Ninguno"
+                    txt_icx = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in icx_df.iterrows()]) if not icx_df.empty else "- Ninguno"
+
+                    # Generar Mensaje WhatsApp con negritas (*texto*)
+                    msg_core = (
+                        f"Buenos dias Juanjo,\n\n"
+                        f"*Eventos de consideración RED CORE:*\n"
+                        f"-SIN EVENTOS\n\n"
+                        f"*Eventos DWDM:*\n"
+                        f"{txt_dwdm}\n\n"
+                        f"*Eventos METRO:*\n"
+                        f"{txt_metro}\n\n"
+                        f"*Eventos ISP:*\n"
+                        f"{txt_isp}\n\n"
+                        f"*Eventos ICX:*\n"
+                        f"{txt_icx}\n\n"
+                        f"*Alarmas de CORTEX:*\n"
+                        f"-{alarmas_cortex}\n\n"
+                        f"*Trabajos Programados:*\n"
+                        f"-{trabajos_prog_core}\n\n"
+                        f"*ROAMING:*\n"
+                        f"-{roaming}\n\n"
+                        f"*HSS-COMFONE:*\n"
+                        f"-{hss_comfone}\n\n"
+                        f"*OTROS:*\n"
+                        f"-{otros}"
+                    )
+
+                    st.subheader("📲 Reporte para WhatsApp (RED CORE)")
+                    st.info("💡 **Tip:** Haz clic en el icono 📋 arriba a la derecha del recuadro para copiar.")
+                    st.code(msg_core, language=None)
 
             except Exception as e:
                 st.error(f"Error al procesar el archivo de CORE: {e}")
