@@ -88,12 +88,15 @@ with tab_pendientes:
                     # Visualización KPIs y Tabla
                     st.subheader("📊 Resumen General")
                     col1, col2 = st.columns(2)
-                    col1.metric("Total Eventos Pendientes", len(df_filtered))
+                    
+                    total_pendientes_filtrados = len(df_filtered)
+                    col1.metric("Total Eventos Pendientes", total_pendientes_filtrados)
 
-                    desglose = {}
+                    desglose_wa = ""
                     if not df_filtered.empty and "IMPACTO" in df_filtered.columns:
-                        desglose = df_filtered["IMPACTO"].value_counts().to_dict()
-                        texto_impacto = " | ".join([f"**{k}:** {v}" for k, v in desglose.items()])
+                        desglose_dic = df_filtered["IMPACTO"].value_counts().to_dict()
+                        texto_impacto = " | ".join([f"**{k}:** {v}" for k, v in desglose_dic.items()])
+                        desglose_wa = ", ".join([f"{k}: {v}" for k, v in desglose_dic.items()])
                         col2.markdown(f"**Desglose por Impacto:**\n\n{texto_impacto}")
 
                     st.markdown("---")
@@ -103,18 +106,17 @@ with tab_pendientes:
                     df_display["FECHA INICIO"] = df_filtered["Fecha_DT"].dt.strftime("%d-%m-%Y")
                     st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-                    # Módulo WhatsApp Optimizado
+                    # Módulo WhatsApp Sincronizado
                     st.markdown("---")
                     st.subheader("📲 Reporte para WhatsApp")
 
                     if not df_filtered.empty:
                         lineas_reporte = []
                         lineas_reporte.append("🚨 *REPORTE DE EVENTOS PENDIENTES (2026)* 🚨\n")
-                        lineas_reporte.append(f"📊 *Total Pendientes:* {len(df_filtered)}")
+                        lineas_reporte.append(f"📊 *Total Pendientes:* {total_pendientes_filtrados}")
                         
-                        if desglose:
-                            desglose_txt = ", ".join([f"{k}: {v}" for k, v in desglose.items()])
-                            lineas_reporte.append(f"📌 *Impacto:* {desglose_txt}")
+                        if desglose_wa:
+                            lineas_reporte.append(f"📌 *Impacto:* {desglose_wa}")
                         
                         lineas_reporte.append("-----------------------------------")
 
@@ -137,7 +139,14 @@ with tab_pendientes:
                                 )
 
                         texto_whatsapp = "\n".join(lineas_reporte)
-                        st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=300, key="txt_wa_pend")
+                        
+                        # Usar clave dinámica basada en la fecha para forzar la actualización inmediata en pantalla
+                        st.text_area(
+                            "Copia el siguiente texto para enviarlo por WhatsApp:", 
+                            texto_whatsapp, 
+                            height=300, 
+                            key=f"txt_wa_pend_{selected_date}_{len(df_filtered)}"
+                        )
                     else:
                         st.warning("No hay eventos que coincidan con los filtros seleccionados.")
 
