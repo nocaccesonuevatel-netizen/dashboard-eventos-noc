@@ -32,11 +32,11 @@ with tab_pendientes:
             if len(df_raw.columns) >= 33:
                 col_ag_nombre = df_raw.columns[32]
             
-            # Columnas requeridas
+            # Columnas requeridas (Se quita SERVICIOS AFECTADOS y se mantiene CRONOLOGIA DEL EVENTO)
             columnas_deseadas = [
                 "FECHA INICIO", "HORA INICIO", "IMPACTO", "ZONA AFECTADA", 
                 "CIUDAD", "CELL ID", "TECNOLOGIAS AFECTADAS", 
-                "SERVICIOS AFECTADOS", "CAUSA PRELIMINAR", "CRONOLOGIA DEL EVENTO"
+                "CAUSA PRELIMINAR", "CRONOLOGIA DEL EVENTO"
             ]
             
             cols_existentes = [col for col in columnas_deseadas if col in df_raw.columns]
@@ -61,25 +61,32 @@ with tab_pendientes:
                 # --- FILTRO AUTOMÁTICO: AÑO 2026 EN ADELANTE ---
                 df = df[df["Año"] >= 2026]
 
-                # Barra Lateral - Filtros por Fecha Específica y Ciudad
+                # Barra Lateral - Filtros por Fecha y Ciudad
                 st.sidebar.header("🔍 Filtros (Pendientes)")
 
-                default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
-                selected_date = st.sidebar.date_input(
-                    "Selecciona Fecha",
-                    value=default_date,
-                    min_value=datetime.date(2026, 1, 1),
-                    max_value=datetime.date(2030, 12, 31),
-                    format="DD/MM/YYYY",
-                    key="date_pendientes"
-                )
+                modo_fecha = st.sidebar.radio("Modo de Fecha:", ["Todas las Fechas", "Fecha Específica"], index=0, key="modo_fecha_pend")
+
+                selected_date = None
+                if modo_fecha == "Fecha Específica":
+                    default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
+                    selected_date = st.sidebar.date_input(
+                        "Selecciona Fecha",
+                        value=default_date,
+                        min_value=datetime.date(2026, 1, 1),
+                        max_value=datetime.date(2030, 12, 31),
+                        format="DD/MM/YYYY",
+                        key="date_pendientes"
+                    )
 
                 # Selector de Ciudad
                 ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
                 selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt, key="ciudades_pend")
 
-                # Aplicar Filtro por Fecha y Ciudad
-                mask = (df["Fecha_DT"].dt.date == selected_date) & (df["CIUDAD"].isin(selected_ciudades))
+                # Aplicar Filtros
+                mask = df["CIUDAD"].isin(selected_ciudades)
+                if modo_fecha == "Fecha Específica" and selected_date:
+                    mask = mask & (df["Fecha_DT"].dt.date == selected_date)
+
                 df_filtered = df[mask]
 
                 # Visualización KPIs y Tabla
@@ -109,7 +116,6 @@ with tab_pendientes:
                     lineas_reporte.append("🚨 *REPORTE DE EVENTOS PENDIENTES* 🚨")
                     lineas_reporte.append(f"📊 *Total Pendientes:* {len(df_filtered)}\n")
 
-                    # Identificar la columna de Cronología en el DataFrame
                     col_crono_pend = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_filtered.columns else None
 
                     for ciudad, grupo in df_filtered.groupby("CIUDAD"):
@@ -122,7 +128,6 @@ with tab_pendientes:
                             lineas_reporte.append(f"🗓️ *Fecha:* {fecha_str}")
                             lineas_reporte.append(f"🔍 *Causa:* {causa}")
 
-                            # Filtrar Cronología: tomar líneas con INICIO o CONTINUA y descartar las que digan FIN
                             if col_crono_pend and pd.notna(row[col_crono_pend]):
                                 texto_crono = str(row[col_crono_pend])
                                 lineas_crono = texto_crono.split("\n")
@@ -137,7 +142,7 @@ with tab_pendientes:
                                     lineas_reporte.append("⏱️ *Cronología:*")
                                     lineas_reporte.extend(crono_filtrada)
 
-                            lineas_reporte.append("")  # Línea en blanco para separar eventos
+                            lineas_reporte.append("")
 
                     texto_whatsapp = "\n".join(lineas_reporte)
                     st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=350, key="txt_wa_pend")
@@ -155,19 +160,14 @@ with tab_pendientes:
 with tab_matutino:
     st.title("🌅 Reporte Matutino Diario")
 
-    # Selector de Turno/Área
     area_turno = st.radio("Selecciona tu Área de Turno:", ["RED ACCESO", "RED CORE"], horizontal=True)
     st.markdown("---")
 
     uploaded_matutino = st.file_uploader(f"Cargar Excel ({area_turno})", type=["xlsx", "xls"], key="uploader_matutino")
 
-    # --------------------------------------------------------------------------
-    # ÁREA: RED ACCESO
-    # --------------------------------------------------------------------------
     if area_turno == "RED ACCESO":
         st.subheader("📡 Reporte Diario - RED ACCESO")
         
-        # Campos de entrada manual con valores por defecto
         col_m1, col_m2 = st.columns(2)
         venc_credito = col_m1.text_input("Vencimiento crédito (Línea Tigo):", value="20/09/26")
         pru_cel = col_m2.text_input("Estado celulares de prueba:", value="Ambos cargando y con normalidad.")
@@ -181,24 +181,19 @@ with tab_matutino:
                 df_acc = pd.read_excel(uploaded_matutino)
                 df_acc.columns = [str(c).strip() for c in df_acc.columns]
                 
-                # Identificar columnas
                 col_crit = df_acc.columns[4] if len(df_acc.columns) >= 5 else "CRITICIDAD"
                 col_crono = df_acc.columns[15] if len(df_acc.columns) >= 16 else "CRONOLOGIA DEL EVENTO"
 
-                # Obtener la columna de Fecha de Inicio (columna C1) solo con [DD/MM/YYYY]
                 col_fecha_acc = df_acc.columns[2] if len(df_acc.columns) >= 3 else df_acc.columns[0]
                 df_acc["Fecha_Formateada"] = pd.to_datetime(df_acc[col_fecha_acc], dayfirst=True, errors="coerce").dt.strftime("[%d/%m/%Y]")
                 df_acc["Fecha_Formateada"] = df_acc["Fecha_Formateada"].fillna("")
 
-                # Filtrar Críticos y Mayores
                 df_criticos = df_acc[df_acc[col_crit].astype(str).str.strip().str.upper() == "ALTA"]
                 df_mayores = df_acc[df_acc[col_crit].astype(str).str.strip().str.upper() == "MEDIA"]
 
-                # Extraer Cronología con Fecha de Inicio
                 txt_criticos = "\n".join([f"-{row['Fecha_Formateada']} {row[col_crono]}" for _, row in df_criticos.iterrows() if pd.notna(row[col_crono])]) if not df_criticos.empty else "-NINGUNO"
                 txt_mayores = "\n".join([f"-{row['Fecha_Formateada']} {row[col_crono]}" for _, row in df_mayores.iterrows() if pd.notna(row[col_crono])]) if not df_mayores.empty else "-NINGUNO"
 
-                # Generar Mensaje WhatsApp con negritas
                 msg_acc = (
                     f"Buenos dias Juanjo,\n\n"
                     f"*Eventos de consideración RED ACCESO*\n"
@@ -224,9 +219,6 @@ with tab_matutino:
         else:
             st.info("👈 Por favor, carga el archivo Excel para generar automáticamente el reporte de RED ACCESO.")
 
-    # --------------------------------------------------------------------------
-    # ÁREA: RED CORE
-    # --------------------------------------------------------------------------
     else:
         st.subheader("🧠 Reporte Diario - RED CORE")
 
@@ -235,15 +227,12 @@ with tab_matutino:
                 df_core_raw = pd.read_excel(uploaded_matutino)
                 df_core_raw.columns = [str(c).strip() for c in df_core_raw.columns]
 
-                # Tomar la Columna C1 (Posición índice 2) para la Fecha de Inicio
                 col_fecha_c1 = df_core_raw.columns[2] if len(df_core_raw.columns) >= 3 else df_core_raw.columns[0]
                 df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha_c1], dayfirst=True, errors="coerce")
                 
-                # Crear texto legible solo de fecha de inicio [DD/MM/YYYY]
                 df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_DT"].dt.strftime("[%d/%m/%Y]")
                 df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_Texto"].fillna("")
 
-                # Selector de fecha tipo calendario
                 col_f1, col_f2 = st.columns([2, 1])
                 filtrar_por_fecha = col_f2.checkbox("Filtrar por fecha", value=True)
 
@@ -260,12 +249,10 @@ with tab_matutino:
                         key="date_core_cal"
                     )
                     
-                    # Filtra desde la fecha seleccionada en adelante
                     df_core_filtered = df_core_raw[df_core_raw["Fecha_DT"].dt.date >= selected_date_core]
                 else:
                     df_core_filtered = df_core_raw.copy()
 
-                # Campos de entrada manual
                 st.markdown("---")
                 col_c1, col_c2 = st.columns(2)
                 alarmas_cortex = col_c1.text_input("Alarmas de CORTEX:", value="Ninguno")
@@ -276,10 +263,8 @@ with tab_matutino:
                 hss_comfone = col_c4.text_input("HSS-COMFONE:", value="Ninguno")
                 otros = col_c5.text_input("OTROS:", value="Ninguno")
 
-                # Identificar la columna P1 (índice 15) para la Cronología del Evento
                 col_crono = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_core_filtered.columns else df_core_filtered.columns[15]
 
-                # Búsqueda flexible de palabras clave incluyendo únicamente la fecha de inicio
                 df_valid_crono = df_core_filtered.dropna(subset=[col_crono]).copy()
                 df_valid_crono["Crono_Str"] = df_valid_crono[col_crono].astype(str)
 
@@ -293,7 +278,6 @@ with tab_matutino:
                 txt_isp = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in isp_df.iterrows()]) if not isp_df.empty else "-Ninguno"
                 txt_icx = "\n".join([f"-{row['Fecha_Texto']} {row['Crono_Str'].strip()}" for _, row in icx_df.iterrows()]) if not icx_df.empty else "- Ninguno"
 
-                # Generar Mensaje WhatsApp con negritas (*texto*)
                 msg_core = (
                     f"Buenos dias Juanjo,\n\n"
                     f"*Eventos de consideración RED CORE:*\n"
