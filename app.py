@@ -61,7 +61,7 @@ with tab_pendientes:
                 # --- FILTRO AUTOMÁTICO: AÑO 2026 EN ADELANTE ---
                 df = df[df["Año"] >= 2026]
 
-                # Barra Lateral - Únicamente Filtro por Fecha Específica
+                # Barra Lateral - Filtros por Fecha Específica y Ciudad
                 st.sidebar.header("🔍 Filtros (Pendientes)")
 
                 default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
@@ -74,8 +74,12 @@ with tab_pendientes:
                     key="date_pendientes"
                 )
 
-                # Aplicar Filtro por Fecha
-                mask = (df["Fecha_DT"].dt.date == selected_date)
+                # Selector de Ciudad
+                ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
+                selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt, key="ciudades_pend")
+
+                # Aplicar Filtro por Fecha y Ciudad
+                mask = (df["Fecha_DT"].dt.date == selected_date) & (df["CIUDAD"].isin(selected_ciudades))
                 df_filtered = df[mask]
 
                 # Visualización KPIs y Tabla
@@ -138,7 +142,7 @@ with tab_pendientes:
                     texto_whatsapp = "\n".join(lineas_reporte)
                     st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=350, key="txt_wa_pend")
                 else:
-                    st.warning("No hay eventos que coincidan con la fecha seleccionada.")
+                    st.warning("No hay eventos que coincidan con los filtros seleccionados.")
 
         except Exception as e:
             st.error(f"Error al procesar el archivo: {e}")
