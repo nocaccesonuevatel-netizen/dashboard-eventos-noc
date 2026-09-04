@@ -32,7 +32,7 @@ with tab_pendientes:
             if len(df_raw.columns) >= 33:
                 col_ag_nombre = df_raw.columns[32]
             
-            # Columnas requeridas (sin SERVICIOS AFECTADOS, incluyendo CRONOLOGIA DEL EVENTO)
+            # Columnas requeridas
             columnas_deseadas = [
                 "FECHA INICIO", "HORA INICIO", "IMPACTO", "ZONA AFECTADA", 
                 "CIUDAD", "CELL ID", "TECNOLOGIAS AFECTADAS", 
@@ -113,6 +113,7 @@ with tab_pendientes:
 
                     col_crono_pend = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_filtered.columns else None
 
+                    # Usar únicamente df_filtered para armar el texto de WhatsApp
                     for ciudad, grupo in df_filtered.groupby("CIUDAD"):
                         lineas_reporte.append(f"📍 *CIUDAD: {str(ciudad).upper()}* ({len(grupo)})")
                         
@@ -140,7 +141,8 @@ with tab_pendientes:
                             lineas_reporte.append("")
 
                     texto_whatsapp = "\n".join(lineas_reporte)
-                    st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=350, key="txt_wa_pend")
+                    # Se remueve el parámetro `key` estático para forzar la actualización del texto en pantalla
+                    st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", value=texto_whatsapp, height=350)
                 else:
                     st.warning("No hay eventos pendientes desde la fecha seleccionada para las ciudades elegidas.")
 
@@ -207,7 +209,7 @@ with tab_matutino:
                 )
 
                 st.subheader("📲 Reporte para WhatsApp (RED ACCESO)")
-                st.text_area("Copia el texto generado:", msg_acc, height=350)
+                st.text_area("Copia el texto generado:", value=msg_acc, height=350)
 
             except Exception as e:
                 st.error(f"Error al procesar el archivo de ACCESO: {e}")
@@ -298,7 +300,7 @@ with tab_matutino:
                 )
 
                 st.subheader("📲 Reporte para WhatsApp (RED CORE)")
-                st.text_area("Copia el texto generado:", msg_core, height=380)
+                st.text_area("Copia el texto generado:", value=msg_core, height=380)
 
             except Exception as e:
                 st.error(f"Error al procesar el archivo de CORE: {e}")
