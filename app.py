@@ -32,7 +32,7 @@ with tab_pendientes:
             if len(df_raw.columns) >= 33:
                 col_ag_nombre = df_raw.columns[32]
             
-            # Columnas requeridas (Se quita SERVICIOS AFECTADOS y se mantiene CRONOLOGIA DEL EVENTO)
+            # Columnas requeridas (sin SERVICIOS AFECTADOS, incluyendo CRONOLOGIA DEL EVENTO)
             columnas_deseadas = [
                 "FECHA INICIO", "HORA INICIO", "IMPACTO", "ZONA AFECTADA", 
                 "CIUDAD", "CELL ID", "TECNOLOGIAS AFECTADAS", 
@@ -61,32 +61,27 @@ with tab_pendientes:
                 # --- FILTRO AUTOMÁTICO: AÑO 2026 EN ADELANTE ---
                 df = df[df["Año"] >= 2026]
 
-                # Barra Lateral - Filtros por Fecha y Ciudad
+                # Barra Lateral - Filtros por Fecha de Inicio y Ciudad
                 st.sidebar.header("🔍 Filtros (Pendientes)")
 
-                modo_fecha = st.sidebar.radio("Modo de Fecha:", ["Todas las Fechas", "Fecha Específica"], index=0, key="modo_fecha_pend")
+                min_f = df["Fecha_DT"].min().date() if not df.empty else datetime.date(2026, 1, 1)
+                max_f = df["Fecha_DT"].max().date() if not df.empty else datetime.date(2030, 12, 31)
 
-                selected_date = None
-                if modo_fecha == "Fecha Específica":
-                    default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
-                    selected_date = st.sidebar.date_input(
-                        "Selecciona Fecha",
-                        value=default_date,
-                        min_value=datetime.date(2026, 1, 1),
-                        max_value=datetime.date(2030, 12, 31),
-                        format="DD/MM/YYYY",
-                        key="date_pendientes"
-                    )
+                selected_date = st.sidebar.date_input(
+                    "Mostrar eventos desde la fecha:",
+                    value=min_f,
+                    min_value=datetime.date(2026, 1, 1),
+                    max_value=max_f,
+                    format="DD/MM/YYYY",
+                    key="date_pendientes"
+                )
 
                 # Selector de Ciudad
                 ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
                 selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt, key="ciudades_pend")
 
-                # Aplicar Filtros
-                mask = df["CIUDAD"].isin(selected_ciudades)
-                if modo_fecha == "Fecha Específica" and selected_date:
-                    mask = mask & (df["Fecha_DT"].dt.date == selected_date)
-
+                # --- APLICAR FILTRO: DESDE LA FECHA SELECCIONADA EN ADELANTE (>=) Y CIUDAD ---
+                mask = (df["Fecha_DT"].dt.date >= selected_date) & (df["CIUDAD"].isin(selected_ciudades))
                 df_filtered = df[mask]
 
                 # Visualización KPIs y Tabla
@@ -147,7 +142,7 @@ with tab_pendientes:
                     texto_whatsapp = "\n".join(lineas_reporte)
                     st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=350, key="txt_wa_pend")
                 else:
-                    st.warning("No hay eventos que coincidan con los filtros seleccionados.")
+                    st.warning("No hay eventos pendientes desde la fecha seleccionada para las ciudades elegidas.")
 
         except Exception as e:
             st.error(f"Error al procesar el archivo: {e}")
