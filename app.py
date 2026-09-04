@@ -16,7 +16,7 @@ tab_pendientes, tab_matutino = st.tabs([
 # MÓDULO 1: REPORTE DE EVENTOS PENDIENTES
 # ==============================================================================
 with tab_pendientes:
-    st.title("🚨 Gestión y Reporte de Eventos Pendientes (Año 2026)")
+    st.title("🚨 Gestión y Reporte de Eventos Pendientes")
 
     uploaded_file = st.sidebar.file_uploader("Cargar Excel (Pendientes)", type=["xlsx", "xls"], key="uploader_pendientes")
 
@@ -36,7 +36,7 @@ with tab_pendientes:
             columnas_deseadas = [
                 "FECHA INICIO", "HORA INICIO", "IMPACTO", "ZONA AFECTADA", 
                 "CIUDAD", "CELL ID", "TECNOLOGIAS AFECTADAS", 
-                "SERVICIOS AFECTADOS", "CAUSA PRELIMINAR"
+                "SERVICIOS AFECTADOS", "CAUSA PRELIMINAR", "CRONOLOGIA DEL EVENTO"
             ]
             
             cols_existentes = [col for col in columnas_deseadas if col in df_raw.columns]
@@ -50,103 +50,133 @@ with tab_pendientes:
                 # --- FILTRO POR ESTADO (COLUMNA AG == PENDIENTE) ---
                 if col_ag_nombre:
                     df = df[df[col_ag_nombre].astype(str).str.strip().str.upper() == "PENDIENTE"]
+                # --------------------------------------------------
 
-                df = df[cols_existentes].copy()
-
-                # Procesamiento y Limpieza de Fechas
+                # Procesamiento de Fechas
                 df["Fecha_DT"] = pd.to_datetime(df["FECHA INICIO"], dayfirst=True, errors="coerce")
                 df = df.dropna(subset=["Fecha_DT"])
 
-                # --- FILTRAR ÚNICAMENTE INFORMACIÓN DEL 2026 ---
-                df = df[df["Fecha_DT"].dt.year == 2026]
+                df["Año"] = df["Fecha_DT"].dt.year
+                df["Mes_Num"] = df["Fecha_DT"].dt.month
 
-                if df.empty:
-                    st.warning("⚠️ No se encontraron eventos pendientes correspondientes al año 2026.")
-                else:
-                    # Barra Lateral - Filtro por Fecha
-                    st.sidebar.header("🔍 Filtros (Pendientes)")
-                    
-                    min_f = df["Fecha_DT"].min().date()
+                meses_es = {
+                    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
+                    7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+                }
+                df["Mes"] = df["Mes_Num"].map(meses_es)
+                df["Semana"] = df["Fecha_DT"].dt.isocalendar().week
 
+                # Barra Lateral - Filtros Módulo 1
+                st.sidebar.header("🔍 Filtros (Pendientes)")
+                
+                modo_filtro = st.sidebar.radio(
+                    "Filtrar por:",
+                    options=["Fecha Específica", "Semana del Año", "Todas las Fechas"],
+                    index=0,
+                    key="modo_filtro_pendientes"
+                )
+
+                selected_date = None
+                selected_semanas = []
+
+                if modo_filtro == "Fecha Específica":
+                    default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
                     selected_date = st.sidebar.date_input(
-                        "Mostrar eventos desde esta fecha en adelante:",
-                        value=min_f,
-                        min_value=datetime.date(2026, 1, 1),
-                        max_value=datetime.date(2026, 12, 31),
+                        "Selecciona Fecha",
+                        value=default_date,
+                        min_value=datetime.date(2020, 1, 1),
+                        max_value=datetime.date(2030, 12, 31),
                         format="DD/MM/YYYY",
                         key="date_pendientes"
                     )
 
-                    ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
-                    selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt, key="ciudades_pend")
+                anios_opt = sorted(df["Año"].unique(), reverse=True)
+                selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt, key="anios_pend")
 
-                    # Aplicar Máscara de Filtro (Fecha en adelante + Ciudades)
-                    mask = (df["Fecha_DT"].dt.date >= selected_date) & (df["CIUDAD"].isin(selected_ciudades))
-                    df_filtered = df[mask].copy()
+                meses_opt = df[df["Año"].isin(selected_anios)].sort_values("Mes_Num")["Mes"].unique().tolist()
+                selected_meses = st.sidebar.multiselect("Mes", options=meses_opt, default=meses_opt, key="meses_pend")
 
-                    # Visualización KPIs y Tabla
-                    st.subheader("📊 Resumen General")
-                    col1, col2 = st.columns(2)
-                    
-                    total_pendientes_filtrados = len(df_filtered)
-                    col1.metric("Total Eventos Pendientes", total_pendientes_filtrados)
+                if modo_filtro == "Semana del Año":
+                    semanas_opt = sorted(df[(df["Año"].isin(selected_anios)) & (df["Mes"].isin(selected_meses))]["Semana"].unique())
+                    selected_semanas = st.sidebar.multiselect("Semana del Año", options=semanas_opt, default=semanas_opt, key="semanas_pend")
 
-                    desglose_wa = ""
-                    if not df_filtered.empty and "IMPACTO" in df_filtered.columns:
-                        desglose_dic = df_filtered["IMPACTO"].value_counts().to_dict()
-                        texto_impacto = " | ".join([f"**{k}:** {v}" for k, v in desglose_dic.items()])
-                        desglose_wa = ", ".join([f"{k}: {v}" for k, v in desglose_dic.items()])
-                        col2.markdown(f"**Desglose por Impacto:**\n\n{texto_impacto}")
+                ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
+                selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt, key="ciudades_pend")
 
-                    st.markdown("---")
-                    st.subheader("📋 Detalle de Eventos Filtrados")
-                    
-                    df_display = df_filtered[cols_existentes].copy()
-                    df_display["FECHA INICIO"] = df_filtered["Fecha_DT"].dt.strftime("%d-%m-%Y")
-                    st.dataframe(df_display, use_container_width=True, hide_index=True)
+                mask = (
+                    (df["Año"].isin(selected_anios)) &
+                    (df["Mes"].isin(selected_meses)) &
+                    (df["CIUDAD"].isin(selected_ciudades))
+                )
 
-                    # Módulo WhatsApp Sincronizado
-                    st.markdown("---")
-                    st.subheader("📲 Reporte para WhatsApp")
+                if modo_filtro == "Fecha Específica" and selected_date:
+                    mask = mask & (df["Fecha_DT"].dt.date == selected_date)
+                elif modo_filtro == "Semana del Año" and selected_semanas:
+                    mask = mask & (df["Semana"].isin(selected_semanas))
 
-                    if not df_filtered.empty:
-                        lineas_reporte = []
-                        lineas_reporte.append("🚨 *REPORTE DE EVENTOS PENDIENTES (2026)* 🚨\n")
-                        lineas_reporte.append(f"📊 *Total Pendientes:* {total_pendientes_filtrados}")
+                df_filtered = df[mask]
+
+                # Visualización KPIs y Tabla
+                st.subheader("📊 Resumen General")
+                col1, col2 = st.columns(2)
+                col1.metric("Total Eventos Pendientes", len(df_filtered))
+
+                if not df_filtered.empty and "IMPACTO" in df_filtered.columns:
+                    desglose = df_filtered["IMPACTO"].value_counts().to_dict()
+                    texto_impacto = " | ".join([f"**{k}:** {v}" for k, v in desglose.items()])
+                    col2.markdown(f"**Desglose por Impacto:**\n\n{texto_impacto}")
+
+                st.markdown("---")
+                st.subheader("📋 Detalle de Eventos Filtrados")
+                
+                cols_tabla = [c for c in cols_existentes if c in df_filtered.columns]
+                df_display = df_filtered[cols_tabla].copy()
+                df_display["FECHA INICIO"] = df_filtered["Fecha_DT"].dt.strftime("%d-%m-%Y")
+                st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+                # Módulo WhatsApp Modificado (Más legible: Ciudad, Fecha, Causa y Cronología de INICIO/CONTINUA)
+                st.markdown("---")
+                st.subheader("📲 Reporte para WhatsApp")
+
+                if not df_filtered.empty:
+                    lineas_reporte = []
+                    lineas_reporte.append("🚨 *REPORTE DE EVENTOS PENDIENTES* 🚨")
+                    lineas_reporte.append(f"📊 *Total Pendientes:* {len(df_filtered)}\n")
+
+                    # Identificar la columna de Cronología en el DataFrame
+                    col_crono_pend = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_filtered.columns else None
+
+                    for ciudad, grupo in df_filtered.groupby("CIUDAD"):
+                        lineas_reporte.append(f"📍 *CIUDAD: {str(ciudad).upper()}* ({len(grupo)})")
                         
-                        if desglose_wa:
-                            lineas_reporte.append(f"📌 *Impacto:* {desglose_wa}")
-                        
-                        lineas_reporte.append("-----------------------------------")
-
-                        for ciudad, grupo in df_filtered.groupby("CIUDAD"):
-                            lineas_reporte.append(f"\n📍 *CIUDAD: {str(ciudad).upper()}* ({len(grupo)})")
+                        for idx, row in grupo.iterrows():
+                            fecha_str = row["Fecha_DT"].strftime("%d/%m/%Y")
+                            causa = row.get("CAUSA PRELIMINAR", "N/A")
                             
-                            for _, row in grupo.iterrows():
-                                fecha_str = row["Fecha_DT"].strftime("%d/%m/%Y")
-                                hora_str = str(row.get("HORA INICIO", "N/I"))[:5]
-                                zona = row.get("ZONA AFECTADA", "N/A")
-                                impacto = row.get("IMPACTO", "N/A")
-                                causa = row.get("CAUSA PRELIMINAR", "N/A")
-                                cell_id = row.get("CELL ID", "N/A")
-                                
-                                lineas_reporte.append(
-                                    f"• *{zona}*"
-                                    f"\n  └ 🗓️ {fecha_str} {hora_str} | ⚠️ {impacto}"
-                                    f"\n  └ 📡 *CELL ID:* {cell_id}"
-                                    f"\n  └ 🔍 *Causa:* {causa}"
-                                )
+                            lineas_reporte.append(f"🗓️ *Fecha:* {fecha_str}")
+                            lineas_reporte.append(f"🔍 *Causa:* {causa}")
 
-                        texto_whatsapp = "\n".join(lineas_reporte)
-                        
-                        st.text_area(
-                            "Copia el siguiente texto para enviarlo por WhatsApp:", 
-                            texto_whatsapp, 
-                            height=300, 
-                            key=f"txt_wa_pend_{selected_date}_{len(df_filtered)}"
-                        )
-                    else:
-                        st.warning("No hay eventos que coincidan con los filtros seleccionados.")
+                            # Filtrar Cronología: tomar líneas con INICIO o CONTINUA y descartar las que digan FIN
+                            if col_crono_pend and pd.notna(row[col_crono_pend]):
+                                texto_crono = str(row[col_crono_pend])
+                                lineas_crono = texto_crono.split("\n")
+                                
+                                crono_filtrada = []
+                                for linea in lineas_crono:
+                                    linea_upper = linea.upper()
+                                    if ("INICIO" in linea_upper or "CONTINUA" in linea_upper) and "FIN" not in linea_upper:
+                                        crono_filtrada.append(f"  └ 📝 {linea.strip()}")
+                                
+                                if crono_filtrada:
+                                    lineas_reporte.append("⏱️ *Cronología:*")
+                                    lineas_reporte.extend(crono_filtrada)
+
+                            lineas_reporte.append("")  # Línea en blanco para separar eventos
+
+                    texto_whatsapp = "\n".join(lineas_reporte)
+                    st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=350, key="txt_wa_pend")
+                else:
+                    st.warning("No hay eventos que coincidan con los filtros seleccionados.")
 
         except Exception as e:
             st.error(f"Error al procesar el archivo: {e}")
@@ -252,23 +282,14 @@ with tab_matutino:
                 filtrar_por_fecha = col_f2.checkbox("Filtrar por fecha", value=True)
 
                 if filtrar_por_fecha and df_core_raw["Fecha_DT"].notna().any():
-                    # Definir el rango permitido del calendario strictly para el año 2026
-                    min_permitido = datetime.date(2026, 1, 1)
-                    max_permitido = datetime.date(2026, 12, 31)
-
-                    # Obtener la primera fecha disponible del DataFrame dentro de 2026
-                    min_f_df = df_core_raw["Fecha_DT"].min().date()
-                    
-                    # Establecer el valor inicial sin salir de los límites de 2026
-                    val_inicial = min_f_df if min_f_df >= min_permitido else min_permitido
-                    if val_inicial > max_permitido:
-                        val_inicial = max_permitido
+                    min_fecha = df_core_raw["Fecha_DT"].min().date()
+                    max_fecha = df_core_raw["Fecha_DT"].max().date()
                     
                     selected_date_core = col_f1.date_input(
                         "📅 Mostrar eventos desde la Fecha (Columna C1):",
-                        value=val_inicial,
-                        min_value=min_permitido,
-                        max_value=max_permitido,
+                        value=min_fecha,
+                        min_value=min_fecha,
+                        max_value=max_fecha,
                         format="DD/MM/YYYY",
                         key="date_core_cal"
                     )
