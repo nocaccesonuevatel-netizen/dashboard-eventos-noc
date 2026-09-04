@@ -57,63 +57,25 @@ with tab_pendientes:
                 df = df.dropna(subset=["Fecha_DT"])
 
                 df["Año"] = df["Fecha_DT"].dt.year
-                df["Mes_Num"] = df["Fecha_DT"].dt.month
 
-                meses_es = {
-                    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
-                    7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
-                }
-                df["Mes"] = df["Mes_Num"].map(meses_es)
-                df["Semana"] = df["Fecha_DT"].dt.isocalendar().week
+                # --- FILTRO AUTOMÁTICO: AÑO 2026 EN ADELANTE ---
+                df = df[df["Año"] >= 2026]
 
-                # Barra Lateral - Filtros Módulo 1
+                # Barra Lateral - Únicamente Filtro por Fecha Específica
                 st.sidebar.header("🔍 Filtros (Pendientes)")
-                
-                modo_filtro = st.sidebar.radio(
-                    "Filtrar por:",
-                    options=["Fecha Específica", "Semana del Año", "Todas las Fechas"],
-                    index=0,
-                    key="modo_filtro_pendientes"
+
+                default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
+                selected_date = st.sidebar.date_input(
+                    "Selecciona Fecha",
+                    value=default_date,
+                    min_value=datetime.date(2026, 1, 1),
+                    max_value=datetime.date(2030, 12, 31),
+                    format="DD/MM/YYYY",
+                    key="date_pendientes"
                 )
 
-                selected_date = None
-                selected_semanas = []
-
-                if modo_filtro == "Fecha Específica":
-                    default_date = df["Fecha_DT"].max().date() if not df.empty else datetime.date.today()
-                    selected_date = st.sidebar.date_input(
-                        "Selecciona Fecha",
-                        value=default_date,
-                        min_value=datetime.date(2020, 1, 1),
-                        max_value=datetime.date(2030, 12, 31),
-                        format="DD/MM/YYYY",
-                        key="date_pendientes"
-                    )
-
-                anios_opt = sorted(df["Año"].unique(), reverse=True)
-                selected_anios = st.sidebar.multiselect("Año", options=anios_opt, default=anios_opt, key="anios_pend")
-
-                meses_opt = df[df["Año"].isin(selected_anios)].sort_values("Mes_Num")["Mes"].unique().tolist()
-                selected_meses = st.sidebar.multiselect("Mes", options=meses_opt, default=meses_opt, key="meses_pend")
-
-                if modo_filtro == "Semana del Año":
-                    semanas_opt = sorted(df[(df["Año"].isin(selected_anios)) & (df["Mes"].isin(selected_meses))]["Semana"].unique())
-                    selected_semanas = st.sidebar.multiselect("Semana del Año", options=semanas_opt, default=semanas_opt, key="semanas_pend")
-
-                ciudades_opt = sorted(df["CIUDAD"].dropna().astype(str).unique())
-                selected_ciudades = st.sidebar.multiselect("Ciudad", options=ciudades_opt, default=ciudades_opt, key="ciudades_pend")
-
-                mask = (
-                    (df["Año"].isin(selected_anios)) &
-                    (df["Mes"].isin(selected_meses)) &
-                    (df["CIUDAD"].isin(selected_ciudades))
-                )
-
-                if modo_filtro == "Fecha Específica" and selected_date:
-                    mask = mask & (df["Fecha_DT"].dt.date == selected_date)
-                elif modo_filtro == "Semana del Año" and selected_semanas:
-                    mask = mask & (df["Semana"].isin(selected_semanas))
-
+                # Aplicar Filtro por Fecha
+                mask = (df["Fecha_DT"].dt.date == selected_date)
                 df_filtered = df[mask]
 
                 # Visualización KPIs y Tabla
@@ -134,7 +96,7 @@ with tab_pendientes:
                 df_display["FECHA INICIO"] = df_filtered["Fecha_DT"].dt.strftime("%d-%m-%Y")
                 st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-                # Módulo WhatsApp Modificado (Más legible: Ciudad, Fecha, Causa y Cronología de INICIO/CONTINUA)
+                # Módulo WhatsApp
                 st.markdown("---")
                 st.subheader("📲 Reporte para WhatsApp")
 
@@ -176,7 +138,7 @@ with tab_pendientes:
                     texto_whatsapp = "\n".join(lineas_reporte)
                     st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", texto_whatsapp, height=350, key="txt_wa_pend")
                 else:
-                    st.warning("No hay eventos que coincidan con los filtros seleccionados.")
+                    st.warning("No hay eventos que coincidan con la fecha seleccionada.")
 
         except Exception as e:
             st.error(f"Error al procesar el archivo: {e}")
