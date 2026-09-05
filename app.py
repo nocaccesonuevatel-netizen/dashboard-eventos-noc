@@ -113,7 +113,6 @@ with tab_pendientes:
 
                     col_crono_pend = "CRONOLOGIA DEL EVENTO" if "CRONOLOGIA DEL EVENTO" in df_filtered.columns else None
 
-                    # Usar únicamente df_filtered para armar el texto de WhatsApp
                     for ciudad, grupo in df_filtered.groupby("CIUDAD"):
                         lineas_reporte.append(f"📍 *CIUDAD: {str(ciudad).upper()}* ({len(grupo)})")
                         
@@ -141,7 +140,6 @@ with tab_pendientes:
                             lineas_reporte.append("")
 
                     texto_whatsapp = "\n".join(lineas_reporte)
-                    # Se remueve el parámetro `key` estático para forzar la actualización del texto en pantalla
                     st.text_area("Copia el siguiente texto para enviarlo por WhatsApp:", value=texto_whatsapp, height=350)
                 else:
                     st.warning("No hay eventos pendientes desde la fecha seleccionada para las ciudades elegidas.")
@@ -226,6 +224,9 @@ with tab_matutino:
 
                 col_fecha_c1 = df_core_raw.columns[2] if len(df_core_raw.columns) >= 3 else df_core_raw.columns[0]
                 df_core_raw["Fecha_DT"] = pd.to_datetime(df_core_raw[col_fecha_c1], dayfirst=True, errors="coerce")
+                
+                # --- FILTRO AUTOMÁTICO RED CORE: AÑO 2026 EN ADELANTE ---
+                df_core_raw = df_core_raw[df_core_raw["Fecha_DT"].dt.year >= 2026]
                 
                 df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_DT"].dt.strftime("[%d/%m/%Y]")
                 df_core_raw["Fecha_Texto"] = df_core_raw["Fecha_Texto"].fillna("")
